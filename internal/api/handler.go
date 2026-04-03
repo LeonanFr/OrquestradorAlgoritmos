@@ -71,7 +71,10 @@ func (h *Handler) RegisterRoutes(r *mux.Router) {
 
 func (h *Handler) healthCheck(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte("OK"))
+
+	if r.Method == http.MethodGet {
+		_, _ = w.Write([]byte("OK"))
+	}
 }
 
 func (h *Handler) startTournament(w http.ResponseWriter, r *http.Request) {
