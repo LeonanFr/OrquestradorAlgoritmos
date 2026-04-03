@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -41,15 +42,23 @@ func (h *Handler) authMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		expectedToken := os.Getenv("API_AUTH_TOKEN")
+		expectedToken := strings.TrimSpace(os.Getenv("API_AUTH_TOKEN"))
+		authHeader := r.Header.Get("Authorization")
+
 		if expectedToken != "" {
-			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+				log.Printf("AUTH_ERROR: Header ausente ou prefixo Bearer faltando")
 				http.Error(w, "missing or invalid token", http.StatusUnauthorized)
 				return
 			}
+
 			token := strings.TrimPrefix(authHeader, "Bearer ")
+			token = strings.TrimSpace(token)
+
 			if token != expectedToken {
+				log.Printf("AUTH_MISMATCH: Esperado(len:%d) [%s] | Recebido(len:%d) [%s]",
+					len(expectedToken), expectedToken, len(token), token)
+
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
 			}
