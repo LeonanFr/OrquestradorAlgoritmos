@@ -61,7 +61,7 @@ func (h *Handler) authMiddleware(next http.Handler) http.Handler {
 func (h *Handler) RegisterRoutes(r *mux.Router) {
 	r.Use(h.authMiddleware)
 
-	r.HandleFunc("/health", h.healthCheck).Methods(http.MethodGet)
+	r.HandleFunc("/health", h.healthCheck).Methods(http.MethodGet, http.MethodHead)
 	r.HandleFunc("/admin/tournament/start", h.startTournament).Methods(http.MethodPost)
 	r.HandleFunc("/api/team/validate", h.validateTeam).Methods(http.MethodPost)
 	r.HandleFunc("/api/team/status", h.getTeamStatus).Methods(http.MethodGet)
