@@ -249,6 +249,26 @@ func (s *Orchestrator) ProcessSubmission(ctx context.Context, req models.SubmitR
 	execRes, execURL, errExec := s.executor.Execute(ctx, payload)
 	execDuration := time.Since(startExec).Milliseconds()
 
+	if req.Type == "submit" {
+		if execRes != nil {
+			switch execRes.Verdict {
+			case "wrong_answer":
+				execRes.Message = "Wrong Answer"
+				execRes.TestCases = nil
+			case "accepted":
+				execRes.Message = "Accepted"
+				execRes.TestCases = nil
+			case "compilation_error", "runtime_error", "time_limit_exceeded":
+				execRes.TestCases = nil
+			default:
+				if execRes.Message == "" {
+					execRes.Message = "Submission failed"
+				}
+				execRes.TestCases = nil
+			}
+		}
+	}
+
 	sub := &models.Submission{
 		TeamID:         team.ID,
 		TournamentID:   t.ID,
@@ -339,6 +359,27 @@ func (s *Orchestrator) ProcessPracticeSubmission(ctx context.Context, challengeI
 	}
 
 	execRes, _, err := s.executor.Execute(ctx, payload)
+
+	if subType == "submit" {
+		if execRes != nil {
+			switch execRes.Verdict {
+			case "wrong_answer":
+				execRes.Message = "Wrong Answer"
+				execRes.TestCases = nil
+			case "accepted":
+				execRes.Message = "Accepted"
+				execRes.TestCases = nil
+			case "compilation_error", "runtime_error", "time_limit_exceeded":
+				execRes.TestCases = nil
+			default:
+				if execRes.Message == "" {
+					execRes.Message = "Submission failed"
+				}
+				execRes.TestCases = nil
+			}
+		}
+	}
+
 	if err != nil {
 		return nil, err
 	}
