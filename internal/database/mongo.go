@@ -58,6 +58,25 @@ func (db *DB) GetTournament(ctx context.Context, id string) (*models.Tournament,
 	return &t, err
 }
 
+func (db *DB) GetTournamentsByStatus(ctx context.Context, statuses []string) ([]models.Tournament, error) {
+	coll := db.client.Database("orchestrator").Collection("tournaments")
+
+	filter := bson.M{"status": bson.M{"$in": statuses}}
+
+	cursor, err := coll.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var list []models.Tournament
+	if err := cursor.All(ctx, &list); err != nil {
+		return nil, err
+	}
+
+	return list, nil
+}
+
 func (db *DB) UpdateTournamentStatus(ctx context.Context, id string, status string, startTime, endTime *time.Time) error {
 	objID, err := bson.ObjectIDFromHex(id)
 	if err != nil {

@@ -76,6 +76,7 @@ func (h *Handler) RegisterRoutes(r *mux.Router) {
 	r.HandleFunc("/api/team/status", h.getTeamStatus).Methods(http.MethodGet)
 	r.HandleFunc("/api/submit", h.submitCode).Methods(http.MethodPost)
 	r.HandleFunc("/api/challenges", h.getChallenges).Methods(http.MethodGet)
+	r.HandleFunc("/api/tournaments", h.listTournaments).Methods(http.MethodGet)
 }
 
 func (h *Handler) healthCheck(w http.ResponseWriter, r *http.Request) {
@@ -84,6 +85,15 @@ func (h *Handler) healthCheck(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		_, _ = w.Write([]byte("OK"))
 	}
+}
+
+func (h *Handler) listTournaments(w http.ResponseWriter, r *http.Request) {
+	tList, err := h.svc.ListAvailableTournaments(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(tList)
 }
 
 func (h *Handler) startTournament(w http.ResponseWriter, r *http.Request) {

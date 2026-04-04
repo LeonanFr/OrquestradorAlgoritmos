@@ -48,6 +48,10 @@ func NewOrchestrator(db *database.DB, execToken string, execTimeoutSec, healthIn
 	}
 }
 
+func (s *Orchestrator) ListAvailableTournaments(ctx context.Context) ([]models.Tournament, error) {
+	return s.db.GetTournamentsByStatus(ctx, []string{"waiting", "active"})
+}
+
 func (s *Orchestrator) StartTournament(ctx context.Context, id string) error {
 	t, err := s.db.GetTournament(ctx, id)
 	if err != nil {
