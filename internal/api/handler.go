@@ -73,6 +73,7 @@ func (h *Handler) RegisterRoutes(r *mux.Router) {
 	apiRouter.HandleFunc("/submit", h.submitCode).Methods(http.MethodPost, http.MethodOptions)
 	apiRouter.HandleFunc("/challenges", h.getChallenges).Methods(http.MethodGet, http.MethodOptions)
 	apiRouter.HandleFunc("/tournaments", h.listTournaments).Methods(http.MethodGet, http.MethodOptions)
+	apiRouter.HandleFunc("/tournaments/{id}", h.getTournamentByID).Methods(http.MethodGet, http.MethodOptions)
 
 	adminRouter := r.PathPrefix("/admin").Subrouter()
 	adminRouter.Use(h.authMiddleware)
@@ -94,6 +95,20 @@ func (h *Handler) listTournaments(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(tList)
+}
+
+func (h *Handler) getTournamentByID(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	tournament, err := h.svc.GetTournamentByID(r.Context(), id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(tournament)
 }
 
 func (h *Handler) startTournament(w http.ResponseWriter, r *http.Request) {

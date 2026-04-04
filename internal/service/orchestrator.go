@@ -52,6 +52,10 @@ func (s *Orchestrator) ListAvailableTournaments(ctx context.Context) ([]models.T
 	return s.db.GetTournamentsByStatus(ctx, []string{"waiting", "active"})
 }
 
+func (s *Orchestrator) GetTournamentByID(ctx context.Context, id string) (*models.Tournament, error) {
+	return s.db.GetTournament(ctx, id)
+}
+
 func (s *Orchestrator) StartTournament(ctx context.Context, id string) error {
 	t, err := s.db.GetTournament(ctx, id)
 	if err != nil {
