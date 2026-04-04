@@ -258,7 +258,10 @@ func (s *Orchestrator) ProcessSubmission(ctx context.Context, req models.SubmitR
 			case "accepted":
 				execRes.Message = "Accepted"
 				execRes.TestCases = nil
-			case "compilation_error", "runtime_error", "time_limit_exceeded":
+			case "time_limit_exceeded":
+				execRes.Message = "Time Limit Exceeded"
+				execRes.TestCases = nil
+			case "compilation_error", "runtime_error":
 				execRes.TestCases = nil
 			default:
 				if execRes.Message == "" {
