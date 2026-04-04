@@ -36,13 +36,12 @@ func main() {
 	handler := api.NewHandler(svc)
 
 	r := mux.NewRouter()
-	r.Use(api.CORSMiddleware)
 	handler.RegisterRoutes(r)
 	r.HandleFunc("/ws", wsManager.HandleConnections)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,
-		Handler: r,
+		Handler: api.CORSMiddleware(r),
 	}
 
 	go func() {

@@ -37,11 +37,6 @@ func CORSMiddleware(next http.Handler) http.Handler {
 
 func (h *Handler) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/health" || r.URL.Path == "/ws" {
-			next.ServeHTTP(w, r)
-			return
-		}
-
 		expectedToken := strings.TrimSpace(os.Getenv("API_AUTH_TOKEN"))
 		authHeader := r.Header.Get("Authorization")
 
@@ -68,20 +63,24 @@ func (h *Handler) authMiddleware(next http.Handler) http.Handler {
 }
 
 func (h *Handler) RegisterRoutes(r *mux.Router) {
-	r.Use(h.authMiddleware)
+	r.HandleFunc("/health", h.healthCheck).Methods(http.MethodGet, http.MethodHead, http.MethodOptions)
 
-	r.HandleFunc("/health", h.healthCheck).Methods(http.MethodGet, http.MethodHead)
-	r.HandleFunc("/admin/tournament/start", h.startTournament).Methods(http.MethodPost)
-	r.HandleFunc("/api/team/validate", h.validateTeam).Methods(http.MethodPost)
-	r.HandleFunc("/api/team/status", h.getTeamStatus).Methods(http.MethodGet)
-	r.HandleFunc("/api/submit", h.submitCode).Methods(http.MethodPost)
-	r.HandleFunc("/api/challenges", h.getChallenges).Methods(http.MethodGet)
-	r.HandleFunc("/api/tournaments", h.listTournaments).Methods(http.MethodGet)
+	apiRouter := r.PathPrefix("/api").Subrouter()
+	apiRouter.Use(h.authMiddleware)
+
+	apiRouter.HandleFunc("/team/validate", h.validateTeam).Methods(http.MethodPost, http.MethodOptions)
+	apiRouter.HandleFunc("/team/status", h.getTeamStatus).Methods(http.MethodGet, http.MethodOptions)
+	apiRouter.HandleFunc("/submit", h.submitCode).Methods(http.MethodPost, http.MethodOptions)
+	apiRouter.HandleFunc("/challenges", h.getChallenges).Methods(http.MethodGet, http.MethodOptions)
+	apiRouter.HandleFunc("/tournaments", h.listTournaments).Methods(http.MethodGet, http.MethodOptions)
+
+	adminRouter := r.PathPrefix("/admin").Subrouter()
+	adminRouter.Use(h.authMiddleware)
+	adminRouter.HandleFunc("/tournament/start", h.startTournament).Methods(http.MethodPost, http.MethodOptions)
 }
 
 func (h *Handler) healthCheck(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
-
 	if r.Method == http.MethodGet {
 		_, _ = w.Write([]byte("OK"))
 	}
@@ -93,6 +92,7 @@ func (h *Handler) listTournaments(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(tList)
 }
 
@@ -110,6 +110,7 @@ func (h *Handler) startTournament(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "started"})
 }
