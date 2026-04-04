@@ -345,6 +345,14 @@ func (s *Orchestrator) ProcessPracticeSubmission(ctx context.Context, challengeI
 	return execRes, nil
 }
 
+func (s *Orchestrator) SaveCode(ctx context.Context, tournamentID bson.ObjectID, teamCode, challengeID, language, code string) error {
+	return s.db.SaveCode(ctx, tournamentID, teamCode, challengeID, language, code)
+}
+
+func (s *Orchestrator) LoadCode(ctx context.Context, tournamentID bson.ObjectID, teamCode, challengeID string) (string, string, error) {
+	return s.db.LoadCode(ctx, tournamentID, teamCode, challengeID)
+}
+
 func (s *Orchestrator) notifyCentralCompleted(route, tournamentID, teamCode string) {
 	payload := map[string]string{
 		"tournamentId": tournamentID,

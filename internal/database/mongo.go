@@ -21,6 +21,7 @@ type DB struct {
 	submissions        *mongo.Collection
 	executors          *mongo.Collection
 	practiceChallenges *mongo.Collection
+	savedCodes         *mongo.Collection
 }
 
 func NewDB(uri string) (*DB, error) {
@@ -48,6 +49,7 @@ func NewDB(uri string) (*DB, error) {
 		submissions:        client.Database(dbName).Collection("submissions"),
 		executors:          client.Database(dbName).Collection("executors"),
 		practiceChallenges: client.Database(dbName).Collection("practice_challenges"),
+		savedCodes:         client.Database(dbName).Collection("saved_codes"),
 	}, nil
 }
 
@@ -95,6 +97,44 @@ func (db *DB) UpdateTournamentStatus(ctx context.Context, id string, status stri
 	}
 	_, err = db.tournaments.UpdateOne(ctx, bson.M{"_id": objID}, update)
 	return err
+}
+
+func (db *DB) SaveCode(ctx context.Context, tournamentID bson.ObjectID, teamCode, challengeID, language, code string) error {
+	filter := bson.M{
+		"tournament_id": tournamentID,
+		"team_code":     teamCode,
+		"challenge_id":  challengeID,
+	}
+	update := bson.M{
+		"$set": bson.M{
+			"language":   language,
+			"code":       code,
+			"updated_at": time.Now(),
+		},
+	}
+	opts := options.UpdateOne().SetUpsert(true)
+	_, err := db.savedCodes.UpdateOne(ctx, filter, update, opts)
+	return err
+}
+
+func (db *DB) LoadCode(ctx context.Context, tournamentID bson.ObjectID, teamCode, challengeID string) (string, string, error) {
+	var result struct {
+		Language string `bson:"language"`
+		Code     string `bson:"code"`
+	}
+	filter := bson.M{
+		"tournament_id": tournamentID,
+		"team_code":     teamCode,
+		"challenge_id":  challengeID,
+	}
+	err := db.savedCodes.FindOne(ctx, filter).Decode(&result)
+	if err == mongo.ErrNoDocuments {
+		return "", "", nil
+	}
+	if err != nil {
+		return "", "", err
+	}
+	return result.Code, result.Language, nil
 }
 
 func (db *DB) GetTeamByCode(ctx context.Context, code string, tournamentID bson.ObjectID) (*models.Team, error) {

@@ -39,6 +39,16 @@ type Team struct {
 	LastSubmitSubmissionAt *time.Time    `bson:"last_submit_submission_at" json:"lastSubmitSubmissionAt"`
 }
 
+type SavedCode struct {
+	ID           bson.ObjectID `bson:"_id,omitempty" json:"id"`
+	TournamentID bson.ObjectID `bson:"tournament_id" json:"tournamentId"`
+	TeamCode     string        `bson:"team_code" json:"teamCode"`
+	ChallengeID  string        `bson:"challenge_id" json:"challengeId"`
+	Language     string        `bson:"language" json:"language"`
+	Code         string        `bson:"code" json:"code"`
+	UpdatedAt    time.Time     `bson:"updated_at" json:"updatedAt"`
+}
+
 type Challenge struct {
 	ID            string `bson:"_id" json:"id"`
 	Title         string `bson:"title" json:"title"`

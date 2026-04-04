@@ -11,6 +11,7 @@ import (
 	"orchestrator/internal/service"
 
 	"github.com/gorilla/mux"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 type Handler struct {
@@ -76,6 +77,8 @@ func (h *Handler) RegisterRoutes(r *mux.Router) {
 	apiRouter.HandleFunc("/tournaments/{id}", h.getTournamentByID).Methods(http.MethodGet, http.MethodOptions)
 	apiRouter.HandleFunc("/practice/challenges", h.getPracticeChallenges).Methods(http.MethodGet, http.MethodOptions)
 	apiRouter.HandleFunc("/practice/submit", h.submitPractice).Methods(http.MethodPost, http.MethodOptions)
+	apiRouter.HandleFunc("/code/save", h.saveCode).Methods(http.MethodPost, http.MethodOptions)
+	apiRouter.HandleFunc("/code/load", h.loadCode).Methods(http.MethodGet, http.MethodOptions)
 
 	adminRouter := r.PathPrefix("/admin").Subrouter()
 	adminRouter.Use(h.authMiddleware)
@@ -149,6 +152,64 @@ func (h *Handler) submitPractice(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(execRes)
+}
+
+func (h *Handler) saveCode(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		TournamentID string `json:"tournamentId"`
+		TeamCode     string `json:"teamCode"`
+		ChallengeID  string `json:"challengeId"`
+		Language     string `json:"language"`
+		Code         string `json:"code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if req.TournamentID == "" || req.TeamCode == "" || req.ChallengeID == "" {
+		http.Error(w, "missing required fields", http.StatusBadRequest)
+		return
+	}
+	objID, err := bson.ObjectIDFromHex(req.TournamentID)
+	if err != nil {
+		http.Error(w, "invalid tournament id", http.StatusBadRequest)
+		return
+	}
+	if err := h.svc.SaveCode(r.Context(), objID, req.TeamCode, req.ChallengeID, req.Language, req.Code); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+func (h *Handler) loadCode(w http.ResponseWriter, r *http.Request) {
+	tournamentID := r.URL.Query().Get("tournamentId")
+	teamCode := r.URL.Query().Get("teamCode")
+	challengeID := r.URL.Query().Get("challengeId")
+	if tournamentID == "" || teamCode == "" || challengeID == "" {
+		http.Error(w, "missing parameters", http.StatusBadRequest)
+		return
+	}
+	objID, err := bson.ObjectIDFromHex(tournamentID)
+	if err != nil {
+		http.Error(w, "invalid tournament id", http.StatusBadRequest)
+		return
+	}
+	code, language, err := h.svc.LoadCode(r.Context(), objID, teamCode, challengeID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if code == "" {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code":     code,
+		"language": language,
+	})
 }
 
 func (h *Handler) startTournament(w http.ResponseWriter, r *http.Request) {
