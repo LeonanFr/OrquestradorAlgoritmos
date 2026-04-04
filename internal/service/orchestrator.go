@@ -67,7 +67,14 @@ func (s *Orchestrator) StartTournament(ctx context.Context, id string) error {
 	}
 
 	now := time.Now()
-	totalDuration := time.Duration(t.DurationMinutes+t.RotationConfig.FinalExtraMin) * time.Minute
+
+	ticks := t.DurationMinutes / t.RotationConfig.PlayerMinutes
+	totalHandoverSeconds := ticks * t.RotationConfig.HandoverSeconds
+
+	baseDuration := time.Duration(t.DurationMinutes+t.RotationConfig.FinalExtraMin) * time.Minute
+	handoverDuration := time.Duration(totalHandoverSeconds) * time.Second
+
+	totalDuration := baseDuration + handoverDuration
 	end := now.Add(totalDuration)
 
 	err = s.db.UpdateTournamentStatus(ctx, id, "active", &now, &end)
