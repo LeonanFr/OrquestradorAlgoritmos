@@ -88,8 +88,8 @@ func (s *Orchestrator) ValidateTeam(ctx context.Context, tournamentID, teamCode 
 		return nil, nil, err
 	}
 
-	if t.Status != "active" {
-		return nil, nil, errors.New("torneio inativo")
+	if t.Status == "finished" {
+		return nil, nil, errors.New("torneio encerrado")
 	}
 
 	url := strings.Replace(t.APIConfig.TeamValidateRoute, "{code}", teamCode, 1)
