@@ -74,6 +74,8 @@ func (h *Handler) RegisterRoutes(r *mux.Router) {
 	apiRouter.HandleFunc("/challenges", h.getChallenges).Methods(http.MethodGet, http.MethodOptions)
 	apiRouter.HandleFunc("/tournaments", h.listTournaments).Methods(http.MethodGet, http.MethodOptions)
 	apiRouter.HandleFunc("/tournaments/{id}", h.getTournamentByID).Methods(http.MethodGet, http.MethodOptions)
+	apiRouter.HandleFunc("/practice/challenges", h.getPracticeChallenges).Methods(http.MethodGet, http.MethodOptions)
+	apiRouter.HandleFunc("/practice/submit", h.submitPractice).Methods(http.MethodPost, http.MethodOptions)
 
 	adminRouter := r.PathPrefix("/admin").Subrouter()
 	adminRouter.Use(h.authMiddleware)
@@ -109,6 +111,44 @@ func (h *Handler) getTournamentByID(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(tournament)
+}
+
+func (h *Handler) getPracticeChallenges(w http.ResponseWriter, r *http.Request) {
+	challenges, err := h.svc.GetPracticeChallenges(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(challenges)
+}
+
+func (h *Handler) submitPractice(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ChallengeID string `json:"challengeId"`
+		Language    string `json:"language"`
+		Code        string `json:"code"`
+		Type        string `json:"type"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if req.ChallengeID == "" || req.Language == "" || req.Code == "" {
+		http.Error(w, "missing fields", http.StatusBadRequest)
+		return
+	}
+	if req.Type == "" {
+		req.Type = "test"
+	}
+
+	execRes, err := h.svc.ProcessPracticeSubmission(r.Context(), req.ChallengeID, req.Language, req.Code, req.Type)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(execRes)
 }
 
 func (h *Handler) startTournament(w http.ResponseWriter, r *http.Request) {

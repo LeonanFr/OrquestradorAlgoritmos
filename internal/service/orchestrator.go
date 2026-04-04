@@ -298,6 +298,53 @@ func (s *Orchestrator) checkCooldown(team *models.Team, t *models.Tournament, su
 	return 0, nil
 }
 
+func (s *Orchestrator) GetPracticeChallenges(ctx context.Context) ([]models.Challenge, error) {
+	return s.db.GetPracticeChallenges(ctx)
+}
+
+func (s *Orchestrator) ProcessPracticeSubmission(ctx context.Context, challengeID, language, code, subType string) (*models.ExecutorResponse, error) {
+	challenge, err := s.db.GetPracticeChallenge(ctx, challengeID)
+	if err != nil {
+		return nil, errors.New("desafio não encontrado")
+	}
+	if len(challenge.TestCases) == 0 {
+		return nil, errors.New("desafio sem casos de teste cadastrados")
+	}
+
+	var inputs, expected []string
+	if subType == "test" {
+		limit := 3
+		if len(challenge.TestCases) < limit {
+			limit = len(challenge.TestCases)
+		}
+		for i := 0; i < limit; i++ {
+			inputs = append(inputs, challenge.TestCases[i].Input)
+			expected = append(expected, challenge.TestCases[i].Expected)
+		}
+	} else {
+		for _, tc := range challenge.TestCases {
+			inputs = append(inputs, tc.Input)
+			expected = append(expected, tc.Expected)
+		}
+	}
+
+	payload := models.ExecutorPayload{
+		Code:      code,
+		Language:  language,
+		Inputs:    inputs,
+		Expected:  expected,
+		Mode:      subType,
+		TimeLimit: challenge.TimeLimitSec,
+		MemLimit:  challenge.MemoryLimitMB,
+	}
+
+	execRes, _, err := s.executor.Execute(ctx, payload)
+	if err != nil {
+		return nil, err
+	}
+	return execRes, nil
+}
+
 func (s *Orchestrator) notifyCentralCompleted(route, tournamentID, teamCode string) {
 	payload := map[string]string{
 		"tournamentId": tournamentID,

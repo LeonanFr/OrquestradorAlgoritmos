@@ -13,13 +13,14 @@ import (
 )
 
 type DB struct {
-	client      *mongo.Client
-	dbName      string
-	tournaments *mongo.Collection
-	teams       *mongo.Collection
-	challenges  *mongo.Collection
-	submissions *mongo.Collection
-	executors   *mongo.Collection
+	client             *mongo.Client
+	dbName             string
+	tournaments        *mongo.Collection
+	teams              *mongo.Collection
+	challenges         *mongo.Collection
+	submissions        *mongo.Collection
+	executors          *mongo.Collection
+	practiceChallenges *mongo.Collection
 }
 
 func NewDB(uri string) (*DB, error) {
@@ -39,13 +40,14 @@ func NewDB(uri string) (*DB, error) {
 
 	dbName := "algoritmos"
 	return &DB{
-		client:      client,
-		dbName:      dbName,
-		tournaments: client.Database(dbName).Collection("tournaments"),
-		teams:       client.Database(dbName).Collection("teams"),
-		challenges:  client.Database(dbName).Collection("challenges"),
-		submissions: client.Database(dbName).Collection("submissions"),
-		executors:   client.Database(dbName).Collection("executors"),
+		client:             client,
+		dbName:             dbName,
+		tournaments:        client.Database(dbName).Collection("tournaments"),
+		teams:              client.Database(dbName).Collection("teams"),
+		challenges:         client.Database(dbName).Collection("challenges"),
+		submissions:        client.Database(dbName).Collection("submissions"),
+		executors:          client.Database(dbName).Collection("executors"),
+		practiceChallenges: client.Database(dbName).Collection("practice_challenges"),
 	}, nil
 }
 
@@ -155,6 +157,28 @@ func (db *DB) InsertSubmission(ctx context.Context, sub *models.Submission) erro
 		sub.ID = res.InsertedID.(bson.ObjectID)
 	}
 	return err
+}
+
+func (db *DB) GetPracticeChallenges(ctx context.Context) ([]models.Challenge, error) {
+	cursor, err := db.practiceChallenges.Find(ctx, bson.M{})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+	var challenges []models.Challenge
+	if err := cursor.All(ctx, &challenges); err != nil {
+		return nil, err
+	}
+	for i := range challenges {
+		challenges[i].TestCases = nil
+	}
+	return challenges, nil
+}
+
+func (db *DB) GetPracticeChallenge(ctx context.Context, id string) (*models.Challenge, error) {
+	var c models.Challenge
+	err := db.practiceChallenges.FindOne(ctx, bson.M{"_id": id}).Decode(&c)
+	return &c, err
 }
 
 func (db *DB) GetActiveExecutors(ctx context.Context) ([]models.ExecutorNodeDB, error) {
