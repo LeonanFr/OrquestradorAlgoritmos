@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"orchestrator/internal/models"
@@ -65,12 +66,14 @@ func (db *DB) GetTournamentsByStatus(ctx context.Context, statuses []string) ([]
 
 	cursor, err := coll.Find(ctx, filter)
 	if err != nil {
+		log.Printf("Erro na busca: %v", err)
 		return nil, err
 	}
 	defer cursor.Close(ctx)
 
 	var list []models.Tournament
 	if err := cursor.All(ctx, &list); err != nil {
+		log.Printf("Erro no decode: %v", err)
 		return nil, err
 	}
 
