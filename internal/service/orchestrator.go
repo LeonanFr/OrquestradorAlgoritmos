@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -294,9 +296,21 @@ func (s *Orchestrator) ProcessSubmission(ctx context.Context, req models.SubmitR
 	_ = s.db.UpdateTeamSubmissionTime(context.Background(), team.ID, req.Type)
 
 	if req.Type == "submit" && execRes.Verdict == "accepted" {
-		updated, _ := s.db.MarkTeamCompleted(context.Background(), team.ID)
-		if updated {
-			go s.notifyCentralCompleted(t.APIConfig.ChallengeCompletedRoute, req.TournamentID, req.TeamCode)
+		if t.ScoreValue <= 0 {
+			return nil, 0, errors.New("torneio sem pontuação configurada")
+		}
+
+		if err := s.notifyCentralCompleted(
+			t.APIConfig.ChallengeCompletedRoute,
+			req.TournamentID,
+			req.TeamCode,
+			t.ScoreValue,
+		); err != nil {
+			return nil, 0, err
+		}
+
+		if _, err := s.db.MarkTeamCompleted(context.Background(), team.ID); err != nil {
+			return nil, 0, err
 		}
 	}
 
@@ -400,18 +414,67 @@ func (s *Orchestrator) LoadCode(ctx context.Context, tournamentID bson.ObjectID,
 	return s.db.LoadCode(ctx, tournamentID, teamCode, challengeID)
 }
 
-func (s *Orchestrator) notifyCentralCompleted(route, tournamentID, teamCode string) {
-	payload := map[string]string{
-		"tournamentId": tournamentID,
-		"teamCode":     teamCode,
+func (s *Orchestrator) notifyCentralCompleted(route, tournamentID, teamCode string, value int) error {
+	if strings.TrimSpace(route) == "" {
+		return errors.New("rota de notificação da central não configurada")
 	}
-	data, _ := json.Marshal(payload)
-	req, err := http.NewRequest(http.MethodPost, route, bytes.NewReader(data))
-	if err == nil {
-		req.Header.Set("Content-Type", "application/json")
-		resp, err := s.httpCli.Do(req)
-		if err == nil && resp != nil {
-			_ = resp.Body.Close()
+
+	if strings.TrimSpace(tournamentID) == "" {
+		return errors.New("tournamentID vazio ao notificar central")
+	}
+
+	if strings.TrimSpace(teamCode) == "" {
+		return errors.New("teamCode vazio ao notificar central")
+	}
+
+	if value <= 0 {
+		return errors.New("pontuação inválida ao notificar central")
+	}
+
+	payload := struct {
+		TournamentID string `json:"tournamentId"`
+		TeamCode     string `json:"teamCode"`
+		Value        int    `json:"value"`
+	}{
+		TournamentID: tournamentID,
+		TeamCode:     teamCode,
+		Value:        value,
+	}
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, route, bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := s.httpCli.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	body, readErr := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	if readErr != nil {
+		return readErr
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		msg := strings.TrimSpace(string(body))
+		if msg == "" {
+			msg = http.StatusText(resp.StatusCode)
 		}
+		return fmt.Errorf("central retornou status %d ao registrar algoritmo: %s", resp.StatusCode, msg)
 	}
+
+	return nil
 }

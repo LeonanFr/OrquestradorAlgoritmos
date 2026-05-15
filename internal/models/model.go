@@ -11,19 +11,24 @@ type Tournament struct {
 	Name            string        `bson:"name" json:"name"`
 	Status          string        `bson:"status" json:"status"`
 	DurationMinutes int           `bson:"duration_minutes" json:"durationMinutes"`
-	RotationConfig  struct {
+	ScoreValue      int           `bson:"score_value" json:"scoreValue"`
+
+	RotationConfig struct {
 		PlayerMinutes   int `bson:"player_minutes" json:"playerMinutes"`
 		HandoverSeconds int `bson:"handover_seconds" json:"handoverSeconds"`
 		FinalExtraMin   int `bson:"final_extra_minutes" json:"finalExtraMinutes"`
 	} `bson:"rotation_config" json:"rotationConfig"`
+
 	Cooldowns struct {
 		TestSeconds   int `bson:"test_seconds" json:"testSeconds"`
 		SubmitSeconds int `bson:"submit_seconds" json:"submitSeconds"`
 	} `bson:"cooldowns" json:"cooldowns"`
+
 	APIConfig struct {
 		TeamValidateRoute       string `bson:"team_validate_route" json:"teamValidateRoute"`
 		ChallengeCompletedRoute string `bson:"challenge_completed_route" json:"challengeCompletedRoute"`
 	} `bson:"api_config" json:"apiConfig"`
+
 	ChallengeIDs []string   `bson:"challenge_ids" json:"challengeIds"`
 	StartTime    *time.Time `bson:"start_time" json:"startTime"`
 	EndTime      *time.Time `bson:"end_time" json:"endTime"`
