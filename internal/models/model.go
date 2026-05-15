@@ -15,6 +15,8 @@ type Tournament struct {
 
 	RotationConfig struct {
 		PlayerMinutes   int `bson:"player_minutes" json:"playerMinutes"`
+		PlayerCount     int `bson:"player_count" json:"playerCount"`
+		RotationRounds  int `bson:"rotation_rounds" json:"rotationRounds"`
 		HandoverSeconds int `bson:"handover_seconds" json:"handoverSeconds"`
 		FinalExtraMin   int `bson:"final_extra_minutes" json:"finalExtraMinutes"`
 	} `bson:"rotation_config" json:"rotationConfig"`

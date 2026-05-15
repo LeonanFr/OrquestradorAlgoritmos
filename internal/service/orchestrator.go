@@ -68,15 +68,43 @@ func (s *Orchestrator) StartTournament(ctx context.Context, id string) error {
 		return errors.New("torneio ja iniciado ou finalizado")
 	}
 
+	if t.RotationConfig.PlayerMinutes <= 0 {
+		return errors.New("rotation_config.player_minutes deve ser maior que zero")
+	}
+
+	if t.RotationConfig.PlayerCount <= 0 {
+		return errors.New("rotation_config.player_count deve ser maior que zero")
+	}
+
+	if t.RotationConfig.RotationRounds <= 0 {
+		return errors.New("rotation_config.rotation_rounds deve ser maior que zero")
+	}
+
+	if t.RotationConfig.HandoverSeconds < 0 {
+		return errors.New("rotation_config.handover_seconds não pode ser negativo")
+	}
+
+	if t.RotationConfig.FinalExtraMin < 0 {
+		return errors.New("rotation_config.final_extra_minutes não pode ser negativo")
+	}
+
 	now := time.Now()
 
-	ticks := t.DurationMinutes / t.RotationConfig.PlayerMinutes
-	totalHandoverSeconds := ticks * t.RotationConfig.HandoverSeconds
+	totalPlayerTurns := t.RotationConfig.PlayerCount * t.RotationConfig.RotationRounds
 
-	baseDuration := time.Duration(t.DurationMinutes+t.RotationConfig.FinalExtraMin) * time.Minute
-	handoverDuration := time.Duration(totalHandoverSeconds) * time.Second
+	playerDuration := time.Duration(
+		t.RotationConfig.PlayerMinutes*totalPlayerTurns,
+	) * time.Minute
 
-	totalDuration := baseDuration + handoverDuration
+	handoverDuration := time.Duration(
+		t.RotationConfig.HandoverSeconds*totalPlayerTurns,
+	) * time.Second
+
+	finalExtraDuration := time.Duration(
+		t.RotationConfig.FinalExtraMin,
+	) * time.Minute
+
+	totalDuration := playerDuration + handoverDuration + finalExtraDuration
 	end := now.Add(totalDuration)
 
 	err = s.db.UpdateTournamentStatus(ctx, id, "active", &now, &end)
