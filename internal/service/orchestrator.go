@@ -51,11 +51,50 @@ func NewOrchestrator(db *database.DB, execToken string, execTimeoutSec, healthIn
 }
 
 func (s *Orchestrator) ListAvailableTournaments(ctx context.Context) ([]models.Tournament, error) {
+	if _, err := s.db.FinishExpiredTournaments(ctx); err != nil {
+		return nil, err
+	}
+
 	return s.db.GetTournamentsByStatus(ctx, []string{"waiting", "active"})
 }
 
 func (s *Orchestrator) GetTournamentByID(ctx context.Context, id string) (*models.Tournament, error) {
-	return s.db.GetTournament(ctx, id)
+	t, err := s.db.GetTournament(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := s.finishTournamentIfExpired(ctx, t); err != nil {
+		return nil, err
+	}
+
+	return t, nil
+}
+
+func (s *Orchestrator) finishTournamentIfExpired(ctx context.Context, t *models.Tournament) (bool, error) {
+	if t == nil {
+		return false, nil
+	}
+
+	if t.Status != "active" {
+		return false, nil
+	}
+
+	if t.EndTime == nil {
+		return false, nil
+	}
+
+	now := time.Now()
+	if now.Before(*t.EndTime) {
+		return false, nil
+	}
+
+	if err := s.db.UpdateTournamentStatus(ctx, t.ID.Hex(), "finished", t.StartTime, t.EndTime); err != nil {
+		return false, err
+	}
+
+	t.Status = "finished"
+	return true, nil
 }
 
 func (s *Orchestrator) StartTournament(ctx context.Context, id string) error {
@@ -129,6 +168,10 @@ func (s *Orchestrator) ValidateTeam(ctx context.Context, tournamentID, teamCode 
 		return nil, nil, err
 	}
 
+	if _, err := s.finishTournamentIfExpired(ctx, t); err != nil {
+		return nil, nil, err
+	}
+
 	if t.Status == "finished" {
 		return nil, nil, errors.New("torneio encerrado")
 	}
@@ -184,6 +227,10 @@ func (s *Orchestrator) GetTeamStatus(ctx context.Context, tournamentID, teamCode
 		return nil, err
 	}
 
+	if _, err := s.finishTournamentIfExpired(ctx, t); err != nil {
+		return nil, err
+	}
+
 	objID, _ := bson.ObjectIDFromHex(tournamentID)
 	team, err := s.db.GetTeamByCode(ctx, teamCode, objID)
 	if err != nil {
@@ -212,6 +259,14 @@ func (s *Orchestrator) GetTournamentChallenges(ctx context.Context, tournamentID
 		return nil, err
 	}
 
+	if _, err := s.finishTournamentIfExpired(ctx, t); err != nil {
+		return nil, err
+	}
+
+	if t.Status == "finished" {
+		return nil, errors.New("torneio encerrado")
+	}
+
 	challenges, err := s.db.GetChallengesByIDs(ctx, t.ChallengeIDs)
 	if err != nil {
 		return nil, err
@@ -225,16 +280,23 @@ func (s *Orchestrator) GetTournamentChallenges(ctx context.Context, tournamentID
 }
 
 func (s *Orchestrator) ProcessSubmission(ctx context.Context, req models.SubmitRequest) (*models.ExecutorResponse, int, error) {
+	receivedAt := time.Now()
+
 	t, err := s.db.GetTournament(ctx, req.TournamentID)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	now := time.Now()
-	if t.Status != "active" || t.StartTime == nil || now.Before(*t.StartTime) || t.EndTime == nil || now.After(*t.EndTime) {
+	if t.Status != "active" || t.StartTime == nil || receivedAt.Before(*t.StartTime) || t.EndTime == nil {
 		return nil, 0, errors.New("torneio inativo ou fora do tempo")
 	}
 
+	if !receivedAt.Before(*t.EndTime) {
+		if _, err := s.finishTournamentIfExpired(ctx, t); err != nil {
+			return nil, 0, err
+		}
+		return nil, 0, errors.New("torneio inativo ou fora do tempo")
+	}
 	objID, _ := bson.ObjectIDFromHex(req.TournamentID)
 	team, err := s.db.GetTeamByCode(ctx, req.TeamCode, objID)
 	if err != nil {

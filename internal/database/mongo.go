@@ -99,6 +99,29 @@ func (db *DB) UpdateTournamentStatus(ctx context.Context, id string, status stri
 	return err
 }
 
+func (db *DB) FinishExpiredTournaments(ctx context.Context) (int64, error) {
+	now := time.Now()
+
+	filter := bson.M{
+		"status":   "active",
+		"end_time": bson.M{"$ne": nil, "$lte": now},
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"status":     "finished",
+			"updated_at": now,
+		},
+	}
+
+	res, err := db.tournaments.UpdateMany(ctx, filter, update)
+	if err != nil {
+		return 0, err
+	}
+
+	return res.ModifiedCount, nil
+}
+
 func (db *DB) SaveCode(ctx context.Context, tournamentID bson.ObjectID, teamCode, challengeID, language, code string) error {
 	filter := bson.M{
 		"tournament_id": tournamentID,
