@@ -66,7 +66,12 @@ func (db *DB) GetTournament(ctx context.Context, id string) (*models.Tournament,
 func (db *DB) GetTournamentsByStatus(ctx context.Context, statuses []string) ([]models.Tournament, error) {
 	filter := bson.M{"status": bson.M{"$in": statuses}}
 
-	cursor, err := db.tournaments.Find(ctx, filter)
+	opts := options.Find().SetSort(bson.D{
+		{Key: "display_order", Value: 1},
+		{Key: "name", Value: 1},
+	})
+
+	cursor, err := db.tournaments.Find(ctx, filter, opts)
 	if err != nil {
 		log.Printf("Erro na busca: %v", err)
 		return nil, err
